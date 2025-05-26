@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RSI & Infusion Calculator - Complete with Rocuronium</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; background: #f4f4f4; }
+    h1, h2 { text-align: center; margin-bottom: 10px; }
+    .input-section { background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+    #weight { width: 100%; font-size: 1.5em; padding: 10px; text-align: center; margin-bottom: 10px; }
+    .numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .numpad button { padding: 15px; font-size: 1.2em; cursor: pointer; }
+    .clear-btn { background: #dc3545; color: #fff; }
+    #calculate-btn { width: 100%; padding: 15px; font-size: 1.2em; cursor: pointer; }
+    .result { background: #fff; padding: 15px; border-radius: 8px; margin-top: 20px; }
+    .result h3 { margin: 0 0 10px 0; }
+    .math { font-family: monospace; background: #eef; padding: 5px; border-radius: 4px; margin-bottom: 8px; }
+    .slider-section { margin: 10px 0; }
+    input[type=range] { width: 100%; }
+    .dose-value { font-weight: bold; color: #007bff; }
+  </style>
+</head>
+<body>
+  <h1>RSI & Infusion Calculator</h1>
+  <div class="input-section">
+    <label for="weight">Patient Weight (kg):</label>
+    <input type="text" id="weight" placeholder="0"/>
+    <div class="numpad">
+      <button onclick="appendNumber('1')">1</button><button onclick="appendNumber('2')">2</button><button onclick="appendNumber('3')">3</button>
+      <button onclick="appendNumber('4')">4</button><button onclick="appendNumber('5')">5</button><button onclick="appendNumber('6')">6</button>
+      <button onclick="appendNumber('7')">7</button><button onclick="appendNumber('8')">8</button><button onclick="appendNumber('9')">9</button>
+      <button class="clear-btn" onclick="clearInput()">C</button><button onclick="appendNumber('0')">0</button><button onclick="appendDecimal()">.</button>
+    </div>
+    <button id="calculate-btn" onclick="calculateAll()" disabled>Calculate</button>
+  </div>
+
+  <div id="results"></div>
+
+  <script>
+    function appendNumber(n) {
+      const w = document.getElementById('weight');
+      w.value = (w.value === '0' ? n : w.value + n);
+      updateBtn();
+    }
+    function appendDecimal() {
+      const w = document.getElementById('weight');
+      if (!w.value.includes('.')) w.value = w.value ? w.value + '.' : '0.';
+      updateBtn();
+    }
+    function clearInput() {
+      document.getElementById('weight').value = '';
+      updateBtn();
+    }
+    function updateBtn() {
+      const v = parseFloat(document.getElementById('weight').value);
+      document.getElementById('calculate-btn').disabled = isNaN(v) || v <= 0;
+    }
+
+    function calculateAll() {
+      const wt = parseFloat(document.getElementById('weight').value);
+      if (isNaN(wt) || wt <= 0) return;
+      const rd = document.getElementById('results');
+      rd.innerHTML = '<h2>RSI Medications</h2>';
+
+      // RSI drugs
+      const ketDose = 1.5, ketC = 50;
+      const succDose = 1.5, succC = 20, succMax = 150;
+      const maintDose = 1.0, maintC = 50;
+      const rocDose = 1.5, rocC = 10;
+
+      // Ketamine RSI
+      const ketMg = (ketDose * wt).toFixed(1), ketVol = (ketMg / ketC).toFixed(2);
+      rd.innerHTML += `<div class="result"><h3>Ketamine (RSI): ${ketVol} mL</h3>
+        <div class="math">1) ${ketDose} mg/kg × ${wt} kg = ${ketMg} mg<br>
+        2) ${ketMg} mg ÷ ${ketC} mg/mL = ${ketVol} mL</div></div>`;
+
+      // Succinylcholine
+      const sr = succDose * wt, succMg = Math.min(sr, succMax).toFixed(1), succVol = (succMg / succC).toFixed(2);
+      rd.innerHTML += `<div class="result"><h3>Succinylcholine: ${succVol} mL</h3>
+        <div class="math">1) ${succDose} mg/kg × ${wt} kg = ${sr.toFixed(1)} mg${sr>succMax?` (capped ${succMax} mg)`:''}<br>
+        2) ${succMg} mg ÷ ${succC} mg/mL = ${succVol} mL</div></div>`;
+
+      // Ketamine Maintenance
+      const mMg = (maintDose * wt).toFixed(1), mVol = (mMg / maintC).toFixed(2);
+      rd.innerHTML += `<div class="result"><h3>Ketamine (Maintenance): ${mVol} mL</h3>
+        <div class="math">1) ${maintDose} mg/kg × ${wt} kg = ${mMg} mg<br>
+        2) ${mMg} mg ÷ ${maintC} mg/mL = ${mVol} mL</div></div>`;
+
+      // Rocuronium RSI
+      const rocMg = (rocDose * wt).toFixed(1), rocVol = (rocMg / rocC).toFixed(2);
+      rd.innerHTML += `<div class="result"><h3>Rocuronium (RSI): ${rocVol} mL</h3>
+        <div class="math">1) ${rocDose} mg/kg × ${wt} kg = ${rocMg} mg<br>
+        2) ${rocMg} mg ÷ ${rocC} mg/mL = ${rocVol} mL</div></div>`;
+
+      // Infusions
+      rd.innerHTML += '<h2>Infusions (60 gtts/mL unless noted)</h2>';
+      const noC = 16, eC = 12, niC = 60, txDose = 1000, txBag = 250, txTime = 10;
+      const noD = 0.1, eD = 0.05, niD = 20;
+
+      // Norepinephrine
+      rd.innerHTML += `<div class="result"><h3>Norepinephrine: <span class="dose-value" id="noRate"></span></h3>
+        <div class="slider-section">
+          <label>Dose (mcg/kg/min): <span id="noVal">${noD}</span></label>
+          <input id="noS" type="range" min="0.1" max="0.3" step="0.05" value="${noD}" />
+        </div>
+        <div class="math" id="noMath"></div>
+        <p>Conc: 4 mg in 250 mL = ${noC} mcg/mL</p></div>`;
+
+      // Epinephrine
+      rd.innerHTML += `<div class="result"><h3>Epinephrine: <span class="dose-value" id="eRate"></span></h3>
+        <div class="slider-section">
+          <label>Dose (mcg/kg/min): <span id="eVal">${eD}</span></label>
+          <input id="eS" type="range" min="0.05" max="0.2" step="0.01" value="${eD}" />
+        </div>
+        <div class="math" id="eMath"></div>
+        <p>Conc: 3 mg in 250 mL = ${eC} mcg/mL</p></div>`;
+
+      // Nitroglycerin
+      rd.innerHTML += `<div class="result"><h3>Nitroglycerin: <span class="dose-value" id="niRate"></span></h3>
+        <div class="slider-section">
+          <label>Dose (mcg/min): <span id="niVal">${niD}</span></label>
+          <input id="niS" type="range" min="20" max="200" step="10" value="${niD}" />
+        </div>
+        <div class="math" id="niMath"></div>
+        <p>Conc: 15 mg in 250 mL = ${niC} mcg/mL</p></div>`;
+
+      // TXA
+      rd.innerHTML += `<div class="result"><h3>Tranexamic Acid (TXA): 1 g IV/IO in ${txBag} mL bag</h3>
+        <div class="math">1) 1000 mg ÷ ${txBag} mL = ${(txDose/txBag).toFixed(2)} mg/mL<br>
+        2) Infuse over ${txTime} min: ${(txBag/txTime).toFixed(1)} mL/min × 10 gtts/mL = ${((txBag/txTime)*10).toFixed(0)} gtts/min</div></div>`;
+
+      function upd(id, conc, mode, rateId, valId, mathId) {
+        const d = parseFloat(document.getElementById(id).value);
+        document.getElementById(valId).textContent = d.toFixed(2);
+        let rate, unit, drip, math;
+        if (mode === 'hr') {
+          rate = ((d * wt * 60) / conc).toFixed(1); unit = 'mL/hr';
+          drip = rate;
+          math = `1) ${d} mcg/kg/min × ${wt} kg × 60 min/hr ÷ ${conc} mcg/mL = ${rate} ${unit}<br>
+                  2) Drip rate: ${rate} mL/hr ÷ 60 min/hr × 60 gtts/mL = ${drip} gtts/min`;
+        } else {
+          rate = (d / conc).toFixed(1); unit = 'mL/min';
+          drip = (rate * 60).toFixed(0);
+          math = `1) ${d} mcg/min ÷ ${conc} mcg/mL = ${rate} ${unit}<br>
+                  2) Drip rate: ${rate} ${unit} × 60 gtts/mL = ${drip} gtts/min`;
+        }
+        document.getElementById(rateId).textContent = rate + ' ' + unit;
+        document.getElementById(mathId).innerHTML = math;
+      }
+
+      // Attach listeners
+      document.getElementById('noS').addEventListener('input', () => upd('noS', noC, 'hr', 'noRate','noVal','noMath'));
+      document.getElementById('eS').addEventListener('input', () => upd('eS', eC, 'hr', 'eRate','eVal','eMath'));
+      document.getElementById('niS').addEventListener('input', () => upd('niS', niC, 'min', 'niRate','niVal','niMath'));
+
+      // Initial calls
+      upd('noS', noC, 'hr', 'noRate','noVal','noMath');
+      upd('eS', eC, 'hr', 'eRate','eVal','eMath');
+      upd('niS', niC, 'min', 'niRate','niVal','niMath');
+    }
+
+    document.getElementById('weight').addEventListener('input', updateBtn);
+  </script>
+</body>
+</html>
