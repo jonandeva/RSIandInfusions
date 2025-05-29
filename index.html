@@ -215,7 +215,7 @@
     }
     .dose-value {
       font-weight: bold;
-      color: var(--dose-value-color); /* Use the dedicated variable */
+      color: var(--dose-value-color);
     }
     label {
       display: block;
@@ -452,28 +452,51 @@
         return `<div class="result"><h3>${drugName}: ${volumeMlFixed} mL</h3><div class="math">${mathDisplayHtml}</div></div>`;
     }
 
+    // UPDATED function updateInfusionDisplay
     function updateInfusionDisplay(sliderElement, concentration, mode, rateDisplayElement, valueDisplayElement, mathDisplayElement) {
         const dose = parseFloat(sliderElement.value);
+        const weight = currentPatientWeight; // Use stored patient weight
+        let rateUnit, exactRate, displayedRate, dripRateGttsMin, mathHtml;
+
+        // Determine slider step decimal places for dose display
         let stepDecimalPlaces = 0;
         const stepValue = parseFloat(sliderElement.step);
-        if (sliderElement.step.includes('.')) { stepDecimalPlaces = sliderElement.step.split('.')[1].length; }
-        else if (stepValue < 1 && stepValue > 0) { stepDecimalPlaces = sliderElement.step.length - 2; }
-        valueDisplayElement.textContent = dose.toFixed(stepDecimalPlaces);
-
-        let rateValue, rateUnit, dripRateGttsMin, mathHtml;
-        const weight = currentPatientWeight;
-        if (mode === 'hr') {
-            rateValue = toFixedNumber((dose * weight * 60) / concentration, 1); rateUnit = 'mL/hr';
-            dripRateGttsMin = toFixedNumber((rateValue / 60) * STANDARD_DRIP_SET_GTTS_ML, 0);
-            mathHtml = `1) ${dose.toFixed(stepDecimalPlaces)} mcg/kg/min × ${weight} kg × 60 min/hr ÷ ${concentration} mcg/mL = ${rateValue} ${rateUnit}<br>2) Drip rate: ${rateValue} ${rateUnit} × (${STANDARD_DRIP_SET_GTTS_ML} gtts/mL ÷ 60 min/hr) = ${dripRateGttsMin} gtts/min`;
-        } else {
-            rateValue = toFixedNumber(dose / concentration, 1); rateUnit = 'mL/min';
-            dripRateGttsMin = toFixedNumber(rateValue * STANDARD_DRIP_SET_GTTS_ML, 0);
-            mathHtml = `1) ${dose.toFixed(stepDecimalPlaces)} mcg/min ÷ ${concentration} mcg/mL = ${rateValue} ${rateUnit}<br>2) Drip rate: ${rateValue} ${rateUnit} × ${STANDARD_DRIP_SET_GTTS_ML} gtts/mL = ${dripRateGttsMin} gtts/min`;
+        if (sliderElement.step.includes('.')) { 
+            stepDecimalPlaces = sliderElement.step.split('.')[1].length; 
+        } else if (stepValue < 1 && stepValue > 0) { 
+            stepDecimalPlaces = sliderElement.step.length - 2; // Handles "0.1", "0.05" etc.
         }
-        rateDisplayElement.textContent = `${rateValue} ${rateUnit}`;
+        valueDisplayElement.textContent = dose.toFixed(stepDecimalPlaces); // Update slider dose value display
+
+        if (mode === 'hr') { // For mcg/kg/min
+            rateUnit = 'mL/hr';
+            exactRate = (dose * weight * 60) / concentration; // Calculate exact rate in mL/hr
+            displayedRate = toFixedNumber(exactRate, 1); // Round for display
+            
+            // Calculate gtts/min using the exact rate
+            dripRateGttsMin = toFixedNumber((exactRate / 60) * STANDARD_DRIP_SET_GTTS_ML, 0);
+            
+            mathHtml = `
+                1) ${dose.toFixed(stepDecimalPlaces)} mcg/kg/min × ${weight} kg × 60 min/hr ÷ ${concentration} mcg/mL = ${displayedRate} ${rateUnit}<br>
+                2) Drip rate: ((${dose.toFixed(stepDecimalPlaces)} mcg/kg/min × ${weight} kg × 60 min/hr ÷ ${concentration} mcg/mL) / 60 min/hr) × ${STANDARD_DRIP_SET_GTTS_ML} gtts/mL = ${dripRateGttsMin} gtts/min`;
+        
+        } else { // For mcg/min (e.g., Nitroglycerin)
+            rateUnit = 'mL/min';
+            exactRate = dose / concentration; // Calculate exact rate in mL/min
+            displayedRate = toFixedNumber(exactRate, 1); // Round for display
+
+            // Calculate gtts/min using the exact rate
+            dripRateGttsMin = toFixedNumber(exactRate * STANDARD_DRIP_SET_GTTS_ML, 0);
+            
+            mathHtml = `
+                1) ${dose.toFixed(stepDecimalPlaces)} mcg/min ÷ ${concentration} mcg/mL = ${displayedRate} ${rateUnit}<br>
+                2) Drip rate: (${dose.toFixed(stepDecimalPlaces)} mcg/min ÷ ${concentration} mcg/mL) × ${STANDARD_DRIP_SET_GTTS_ML} gtts/mL = ${dripRateGttsMin} gtts/min`;
+        }
+        
+        rateDisplayElement.textContent = `${displayedRate} ${rateUnit}`; // Update main rate display (e.g., in H3)
         mathDisplayElement.innerHTML = mathHtml;
     }
+
 
     function calculateAll() {
         const patientWeightKg = parseFloat(weightInput.value);
